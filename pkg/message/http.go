@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -11,16 +12,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// https://tools.ietf.org/html/rfc2616
-// refer /usr/local/Cellar/go/1.16.3/libexec/src/net/http/request.go:1021 readRequest
-
-type HTTPMessageReader struct {
-}
-
-func (H HTTPMessageReader) Name() string {
-	return "http"
-}
 
 const (
 	headerKeyContentLength = "Content-Length"
@@ -30,105 +21,134 @@ const (
 	boundaryPrefix         = "boundary="
 )
 
-// support HTTP1 plaintext
-// DO NOT Support:
-// 1. https
-// 2. websocket
+// HTTPMessageReader reads HTTP messages in plain text format
+// Does not support HTTPS or WebSocket protocols
+type HTTPMessageReader struct{}
 
+// Name returns the protocol name
+func (H HTTPMessageReader) Name() string {
+	return "http"
+}
+
+// ReadMessage reads and parses an HTTP message from the connection
 func (H HTTPMessageReader) ReadMessage(conn io.Reader) ([]byte, error) {
 	tp := textproto.NewReader(bufio.NewReader(conn))
+
+	// Read the start line (e.g., "GET / HTTP/1.1")
 	startLine, err := tp.ReadLine()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read start line: %w", err)
 	}
-	logrus.Debug(startLine)
+	logrus.Debug("Start Line: ", startLine)
 
+	// Read headers
 	headers, err := tp.ReadMIMEHeader()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read headers: %w", err)
 	}
-	logrus.Debug(headers)
+	logrus.Debug("Headers: ", headers)
 
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages#body
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages#body_2
-	// 1. without body
+	// Initialize body buffer
 	var body []byte
 
-	// first check form type
+	// Check for multipart/form-data content type
 	isFormContentType := false
 	if vv, ok := headers[headerKeyContentType]; ok {
-		logrus.Debug(vv[0])
-		parts := strings.Split(vv[0], ";")
-		contentType := strings.TrimSpace(parts[0])
-		// 3. Multiple-resource bodies
+		contentType := strings.TrimSpace(strings.Split(vv[0], ";")[0])
 		if contentType == headerFormContentType {
 			isFormContentType = true
-			if len(parts) < 2 {
-				return nil, errors.New("expect boundary= part in " + headerKeyContentType)
-			}
-			boundaryPart := strings.TrimSpace(parts[1])
-			if !strings.HasPrefix(boundaryPart, boundaryPrefix) {
-				return nil, errors.New("expect boundary= part in " + headerKeyContentType)
-			}
-
-			lastBoundary := "--" + strings.TrimPrefix(boundaryPart, boundaryPrefix) + "--"
-			scanner := bufio.NewScanner(tp.R)
-			for scanner.Scan() {
-				line := scanner.Bytes()
-				body = append(body, line...)
-				body = append(body, []byte(CRLF)...)
-				if string(line) == lastBoundary {
-					break
-				}
-			}
-			if err := scanner.Err(); err != nil {
+			body, err = H.readMultipartFormBody(tp, vv[0])
+			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	// 2. Single-resource bodies: use Content-Length as size
+	// Handle single-resource bodies using Content-Length
 	if !isFormContentType {
 		if vv, ok := headers[headerKeyContentLength]; ok {
-			size, err := strconv.Atoi(vv[0])
+			contentLength, err := strconv.Atoi(vv[0])
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("invalid Content-Length: %w", err)
 			}
-
-			body = make([]byte, size)
-			_, err = tp.R.Read(body)
+			body, err = H.readBodyWithLength(tp.R, contentLength)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	// TODO: 4. Transfer-Encoding
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
+	// TODO: Handle Transfer-Encoding (e.g., chunked)
+	// Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
 
+	// Dump the entire HTTP message into a byte slice
 	msg := dumpHTTPMessage(startLine, headers, body)
 
+	// Log the complete message in debug mode
 	if logrus.GetLevel() == logrus.DebugLevel {
 		spew.Dump(msg)
 	}
 
-	return msg, err
+	return msg, nil
 }
 
+// readMultipartFormBody reads multipart/form-data content with boundary parsing
+func (H HTTPMessageReader) readMultipartFormBody(tp *textproto.Reader, contentTypeHeader string) ([]byte, error) {
+	// Parse the boundary from Content-Type header
+	parts := strings.Split(contentTypeHeader, ";")
+	if len(parts) < 2 {
+		return nil, errors.New("missing boundary in Content-Type")
+	}
+	boundary := strings.TrimPrefix(strings.TrimSpace(parts[1]), boundaryPrefix)
+	if boundary == "" {
+		return nil, errors.New("boundary not specified in Content-Type")
+	}
+
+	// Prepare to scan for the boundary
+	var body bytes.Buffer
+	scanner := bufio.NewScanner(tp.R)
+	lastBoundary := "--" + boundary + "--"
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		body.Write(line)
+		body.WriteString(CRLF)
+		if string(line) == lastBoundary {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading multipart body: %w", err)
+	}
+
+	return body.Bytes(), nil
+}
+
+// readBodyWithLength reads a fixed-length body based on Content-Length header
+func (H HTTPMessageReader) readBodyWithLength(conn io.Reader, contentLength int) ([]byte, error) {
+	body := make([]byte, contentLength)
+	if _, err := io.ReadFull(conn, body); err != nil {
+		return nil, fmt.Errorf("failed to read body with length %d: %w", contentLength, err)
+	}
+	return body, nil
+}
+
+// dumpHTTPMessage formats the HTTP message for output as a byte slice
 func dumpHTTPMessage(startLine string, headers textproto.MIMEHeader, body []byte) []byte {
 	var b bytes.Buffer
 	b.WriteString(startLine)
 	b.WriteString(CRLF)
-	for k, vv := range headers {
-		for _, v := range vv {
-			b.WriteString(k)
+	for key, values := range headers {
+		for _, value := range values {
+			b.WriteString(key)
 			b.WriteString(": ")
-			b.WriteString(v)
+			b.WriteString(value)
 			b.WriteString(CRLF)
 		}
 	}
 	b.WriteString(CRLF)
-	if len(body) != 0 {
+	if len(body) > 0 {
 		b.Write(body)
 	}
 	return b.Bytes()
