@@ -22,21 +22,23 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/sirupsen/logrus"
 	"os"
 )
 
-var verbose bool
-var debug bool
+var (
+	verbose        bool
+	debug          bool
+	configFilePath string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "tcp-multiplexer",
-	Short: "A brief description of your application",
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	Short: "A TCP multiplexer with flexible configuration and logging options",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -49,6 +51,64 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose log")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "debug", "d", false, "debug log")
+	// Load configuration file if specified
+	rootCmd.PersistentFlags().StringVarP(&configFilePath, "config", "c", "", "path to configuration file (JSON format)")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "enable debug logging")
+
+	cobra.OnInitialize(initConfig)
+}
+
+func initConfig() {
+	// Set log formatting
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+
+	// Set log level based on flags
+	if debug {
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.SetReportCaller(true)
+	} else if verbose {
+		logrus.SetLevel(logrus.InfoLevel)
+	} else {
+		logrus.SetLevel(logrus.WarnLevel)
+	}
+
+	// Load config from file if provided
+	if configFilePath != "" {
+		if err := loadConfig(configFilePath); err != nil {
+			logrus.Fatalf("Failed to load config file: %v", err)
+		}
+	}
+}
+
+// loadConfig loads configuration from the specified file path
+func loadConfig(filePath string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("could not open config file: %w", err)
+	}
+	defer file.Close()
+
+	// Assuming configuration includes fields like port, targetServer, and applicationProtocol
+	var config struct {
+		Port                string `json:"port"`
+		TargetServer        string `json:"target_server"`
+		ApplicationProtocol string `json:"application_protocol"`
+	}
+
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&config); err != nil {
+		return fmt.Errorf("could not decode config file: %w", err)
+	}
+
+	// Assign loaded config to the respective variables
+	// Assuming `port`, `targetServer`, and `applicationProtocol` are used globally
+	port = config.Port
+	targetServer = config.TargetServer
+	applicationProtocol = config.ApplicationProtocol
+
+	logrus.Infof("Configuration loaded from %s", filePath)
+	return nil
 }
