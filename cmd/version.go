@@ -1,6 +1,4 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -22,6 +20,7 @@ import (
 )
 
 var (
+	// Versioning variables set through build flags
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
@@ -31,9 +30,9 @@ var (
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "binary version",
+	Short: "Display version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("version %s, commit %s, built at %s by %s\n", version, commit, date, builtBy)
+		fmt.Printf("Version:\t%s\nCommit:\t\t%s\nBuilt at:\t%s\nBuilt by:\t%s\n", version, commit, date, builtBy)
 	},
 }
 
