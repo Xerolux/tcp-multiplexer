@@ -18,6 +18,7 @@ func init() {
 	logrus.SetLevel(logrus.InfoLevel)
 }
 
+// handleErr prints the error and exits if the error is non-nil
 func handleErr(err error) {
 	if err != nil {
 		fmt.Println(err)
@@ -25,25 +26,30 @@ func handleErr(err error) {
 	}
 }
 
+// client simulates a TCP client that sends messages and verifies echo responses
 func client(t *testing.T, server string, clientIndex int) {
 	conn, err := net.Dial("tcp", server)
 	handleErr(err)
 	defer conn.Close()
 
 	for i := 0; i < 10; i++ {
+		// Send an echo message
 		echo := []byte(fmt.Sprintf("client %d counter %d\n", clientIndex, i))
 		_, err = conn.Write(echo)
 		handleErr(err)
 
+		// Read echo response
 		echoReply, err := message.EchoMessageReader{}.ReadMessage(conn)
 		handleErr(err)
 
+		// Assert that the response matches the sent message
 		assert.Equal(t, echo, echoReply)
 	}
 
-	fmt.Println("client connection closed")
+	fmt.Printf("Client %d: connection closed\n", clientIndex)
 }
 
+// handleConnection handles incoming connections by echoing received messages
 func handleConnection(conn net.Conn) {
 	defer func(c net.Conn) {
 		err := c.Close()
@@ -52,63 +58,78 @@ func handleConnection(conn net.Conn) {
 		}
 	}(conn)
 
+	reader := bufio.NewReader(conn)
 	for {
-		data, err := bufio.NewReader(conn).ReadBytes('\n')
+		// Read message until newline
+		data, err := reader.ReadBytes('\n')
 		if err == io.EOF {
-			fmt.Println("connection is closed")
+			fmt.Println("Connection closed by client")
 			break
 		}
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error reading from connection:", err)
 			break
 		}
 
+		// Echo the received message back to the client
 		_, err = conn.Write(data)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error writing to connection:", err)
 			break
 		}
 	}
 }
 
+// TestMultiplexer_Start tests the multiplexer server with multiple concurrent clients
 func TestMultiplexer_Start(t *testing.T) {
-	l, err := net.Listen("tcp", ":0")
+	// Create a listener to simulate the target server
+	listener, err := net.Listen("tcp", ":0")
+	handleErr(err)
+	defer listener.Close()
+
+	// Handle incoming connections to the simulated target server
 	go func() {
-		defer l.Close()
 		for {
-			conn, err := l.Accept()
+			conn, err := listener.Accept()
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println("Error accepting connection:", err)
 				break
 			}
 			go handleConnection(conn)
 		}
 	}()
-	const muxServer = "127.0.0.1:1235"
 
-	mux := New(l.Addr().String(), "1235", message.EchoMessageReader{})
+	// Start the multiplexer
+	muxServerPort := "1235"
+	muxServer := "127.0.0.1:" + muxServerPort
+	mux := New(listener.Addr().String(), muxServerPort, message.EchoMessageReader{})
 
 	go func() {
 		err := mux.Start()
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 	}()
 
+	// Allow server setup time
 	time.Sleep(time.Second)
 
+	// Start multiple clients and test echo functionality
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		client(t, muxServer, 1)
-		wg.Done()
-	}()
-	go func() {
-		client(t, muxServer, 2)
-		wg.Done()
-	}()
+	clientCount := 2
+	wg.Add(clientCount)
+	for i := 1; i <= clientCount; i++ {
+		go func(clientIndex int) {
+			client(t, muxServer, clientIndex)
+			wg.Done()
+		}(i)
+	}
 
+	// Wait for all clients to finish
 	wg.Wait()
+
+	// Allow cleanup time before shutting down the multiplexer
 	time.Sleep(time.Second)
 
+	// Close the multiplexer server
 	err = mux.Close()
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 }
