@@ -13,11 +13,12 @@ const (
 	maxPDULength      = 253 // Maximum Modbus PDU length
 )
 
-// Buffer pool for Modbus message handling
+// Buffer pool for Modbus message handling - Store slice pointers to avoid allocations
 var modbusBufferPool = sync.Pool{
 	New: func() interface{} {
 		// Pre-allocate maximum possible Modbus TCP frame size
-		return make([]byte, maxTCPFrameLength)
+		buf := make([]byte, maxTCPFrameLength)
+		return &buf // Return pointer to avoid allocations
 	},
 }
 
@@ -28,9 +29,11 @@ func (m ModbusMessageReader) Name() string {
 }
 
 func (m ModbusMessageReader) ReadMessage(conn io.Reader) ([]byte, error) {
-	// Get buffer from pool
-	buffer := modbusBufferPool.Get().([]byte)
-	defer modbusBufferPool.Put(buffer)
+	// Get buffer from pool (as pointer to avoid allocations)
+	bufPtr := modbusBufferPool.Get().(*[]byte)
+	defer modbusBufferPool.Put(bufPtr) // Return pointer to pool
+
+	buffer := *bufPtr // Dereference for easier use
 
 	// Read the MBAP header (first 6 bytes)
 	if _, err := io.ReadFull(conn, buffer[:mbapHeaderLength]); err != nil {
