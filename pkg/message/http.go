@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/textproto"
 	"strconv"
 	"strings"
@@ -202,20 +203,31 @@ func readChunkedBody(reader *bufio.Reader, dst *bytes.Buffer) error {
 			return nil
 		}
 
+		// Check if chunkSize is within the valid range for int
+		if chunkSize < 0 {
+			return fmt.Errorf("negative chunk size: %d", chunkSize)
+		}
+		if chunkSize > math.MaxInt {
+			return fmt.Errorf("chunk size too large for this system: %d", chunkSize)
+		}
+
+		// Now safely convert to int
+		chunkSizeInt := int(chunkSize)
+
 		// Check size constraints
-		totalSize += int(chunkSize)
+		totalSize += chunkSizeInt
 		if totalSize > maxBodySize {
 			return errors.New("HTTP chunked body too large")
 		}
 
 		// Create small buffer for limited reads
-		bufSize := int(chunkSize)
+		bufSize := chunkSizeInt
 		if bufSize > 8192 {
 			bufSize = 8192
 		}
 
 		// Read the chunk data in smaller pieces if necessary
-		remaining := int(chunkSize)
+		remaining := chunkSizeInt
 		for remaining > 0 {
 			readSize := remaining
 			if readSize > bufSize {
