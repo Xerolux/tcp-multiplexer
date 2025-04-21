@@ -1,0 +1,111 @@
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+          cache: true
+      - name: Test
+        run: go test -v ./...
+
+  build:
+    name: Build
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-os: [linux, darwin, windows]
+        go-arch: [amd64, arm64]
+        # Wenn du bestimmte Kombinationen ausschließen möchtest, entferne die Kommentarzeichen
+        # exclude:
+        #   - go-os: windows
+        #     go-arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+          cache: true
+      - name: Build
+        run: |
+          GOOS=${{ matrix.go-os }} GOARCH=${{ matrix.go-arch }} go build -o tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}${{ matrix.go-os == 'windows' && '.exe' || '' }} -v .
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}
+          path: tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}${{ matrix.go-os == 'windows' && '.exe' || '' }}
+          retention-days: 7
+
+  docker:
+    name: Build Docker Image
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+          cache: true
+      - name: Build
+        run: go build -o tcp-multiplexer
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_PASSWORD != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/xerolux/tcp-multiplexer
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64

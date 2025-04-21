@@ -1,0 +1,14 @@
+services:
+  modbus-proxy:
+    image: ghcr.io/xerolux/tcp-multiplexer
+    container_name: modbus_proxy
+    ports:
+      - "5020:5020"
+    command: [ "server", "-t", "192.168.1.22:1502", "-l", "5020", "-p", "modbus", "-v", "--max-connections", "2" ]
+    restart: unless-stopped
+    # Optional resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 50M

@@ -1,0 +1,23 @@
+[Unit]
+Description=TCP Multiplexer Service
+Documentation=https://github.com/Xerolux/tcp-multiplexer
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tcp-multiplexer
+Group=tcp-multiplexer
+ExecStart=/usr/local/bin/tcp-multiplexer server -p modbus -t 192.168.178.198:1502 -l 502 --max-connections 2
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tcp-multiplexer
+# Hardening options
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

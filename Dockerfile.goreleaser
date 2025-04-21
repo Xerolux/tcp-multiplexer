@@ -1,0 +1,21 @@
+# Einfaches Dockerfile für GoReleaser
+FROM scratch
+
+# Copy binary - GoReleaser stellt die Binary bereits bereit
+COPY tcp-multiplexer /
+
+# Set user to non-root (nobody)
+USER 65534:65534
+
+# Expose port
+EXPOSE 8000
+
+# Run application
+ENTRYPOINT ["/tcp-multiplexer"]
+CMD ["server", "-p", "echo"]
+
+# Add labels according to OCI image spec
+LABEL org.opencontainers.image.title="TCP Multiplexer" \
+      org.opencontainers.image.description="Multiplex multiple connections into a single TCP connection" \
+      org.opencontainers.image.source="https://github.com/Xerolux/tcp-multiplexer" \
+      org.opencontainers.image.licenses="MIT"
