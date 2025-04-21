@@ -190,6 +190,11 @@ func readChunkedBody(reader *bufio.Reader, dst *bytes.Buffer) error {
 			return fmt.Errorf("invalid chunk size: %s", line)
 		}
 
+		// Check if chunkSize is within the range of int
+		if chunkSize < math.MinInt || chunkSize > math.MaxInt {
+			return fmt.Errorf("chunk size out of range: %d", chunkSize)
+		}
+
 		// Zero-sized chunk means end of content
 		if chunkSize == 0 {
 			// Read the final CRLF
