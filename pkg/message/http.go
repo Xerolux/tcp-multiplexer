@@ -209,6 +209,11 @@ func readChunkedBody(reader *bufio.Reader, dst *bytes.Buffer) error {
 		}
 
 		// Create small buffer for limited reads
+		// Check if chunkSize is within the range of the int type
+		if chunkSize < int64(^uint(0)>>1)*-1 || chunkSize > int64(^uint(0)>>1) {
+			return fmt.Errorf("chunk size out of range for int type: %d", chunkSize)
+		}
+
 		bufSize := int(chunkSize)
 		if bufSize > 8192 {
 			bufSize = 8192
