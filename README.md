@@ -1,24 +1,31 @@
-# tcp-multiplexer
+# TCP-Multiplexer
 
-TCP-Multiplexer ist ein leistungsstarkes Tool, das mehrere Client-Verbindungen über eine einzelne TCP-Verbindung zu einem Zielserver bündelt. Es ist ideal für Szenarien, in denen der Zielserver nur eine begrenzte Anzahl gleichzeitiger TCP-Verbindungen unterstützt.
+[![Go](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/go.yml/badge.svg)](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/go.yml)
+[![Release](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/release.yml/badge.svg)](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/release.yml)
+[![CodeQL](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/Xerolux/tcp-multiplexer/actions/workflows/codeql-analysis.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Latest Release](https://img.shields.io/github/v/release/Xerolux/tcp-multiplexer?include_prereleases&sort=semver)](https://github.com/Xerolux/tcp-multiplexer/releases/latest)
 
-Ein typischer Anwendungsfall ist die Verbindung mehrerer Modbus/TCP-Clients mit Solarwechselrichtern, die oft nur eine einzelne TCP-Verbindung unterstützen.
+TCP-Multiplexer is a powerful tool that bundles multiple client connections through a single TCP connection to a target server. It is ideal for scenarios where the target server supports only a limited number of simultaneous TCP connections.
 
-## Inhaltsverzeichnis
+A typical use case is connecting multiple Modbus/TCP clients to solar inverters, which often only support a single TCP connection.
 
-- [Architektur](#architektur)
-- [Funktionsweise](#funktionsweise)
-- [Unterstützte Protokolle](#unterstützte-anwendungsprotokolle)
+## Table of Contents
+
+- [Architecture](#architecture)
+- [How It Works](#how-it-works)
+- [Supported Protocols](#supported-protocols)
 - [Installation](#installation)
-- [Konfiguration](#konfiguration)
-- [Systemd-Service](#systemd-service)
-- [Verwendungsbeispiele](#verwendungsbeispiele)
-- [Performance-Optimierung](#performance-optimierung)
-- [Fehlerbehebung](#fehlerbehebung)
-- [Mitwirken](#mitwirken)
-- [Lizenz](#lizenz)
+- [Configuration](#configuration)
+- [Systemd Service](#systemd-service)
+- [Usage Examples](#usage-examples)
+- [Performance Optimization](#performance-optimization)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Sponsorship](#sponsorship)
 
-## Architektur
+## Architecture
 
 ```
 ┌──────────┐
@@ -30,37 +37,36 @@ Ein typischer Anwendungsfall ist die Verbindung mehrerer Modbus/TCP-Clients mit 
 
 
 ─────► TCP connection
-
-drawn by https://asciiflow.com/
 ```
 
-Im Gegensatz zu einem Reverse-Proxy wird die TCP-Verbindung zwischen `tcp-multiplexer` und dem Zielserver für alle Client-Verbindungen wiederverwendet. Die neue Implementierung unterstützt jetzt auch einen Connection-Pool für höhere Durchsatzraten.
+Unlike a reverse proxy, the TCP connection between `tcp-multiplexer` and the target server is reused for all client connections. The current implementation also supports a connection pool for higher throughput.
 
-## Funktionsweise
+## How It Works
 
-Der TCP-Multiplexer verwendet einen Anfrage-Antwort-Muster, um die Kommunikation zu koordinieren:
+TCP-Multiplexer uses a request-response pattern to coordinate communication:
 
-1. Client stellt eine TCP-Verbindung zum Multiplexer her
-2. Multiplexer empfängt Nachrichten vom Client
-3. Multiplexer leitet die Anfrage an den Zielserver weiter
-4. Multiplexer empfängt die Antwort vom Zielserver
-5. Multiplexer leitet die Antwort zurück an den Client
+1. Client establishes a TCP connection to the multiplexer
+2. Multiplexer receives messages from the client
+3. Multiplexer forwards the request to the target server
+4. Multiplexer receives the response from the target server
+5. Multiplexer returns the response back to the client
 
-Die verbesserte Version bietet:
-- Connection-Pooling für höheren Durchsatz
-- Automatische Wiederherstellung fehlgeschlagener Verbindungen
-- Gesundheitsüberwachung für Verbindungen
-- Konfigurierbare Timeouts und Puffergrößen
+The enhanced version offers:
+- Connection pooling for higher throughput
+- Automatic recovery of failed connections
+- Connection health monitoring
+- Configurable timeouts and buffer sizes
+- Round-robin load balancing with the connection pool
 
-## Unterstützte Anwendungsprotokolle
+## Supported Protocols
 
-TCP-Multiplexer unterstützt verschiedene Anwendungsprotokolle:
+TCP-Multiplexer supports various application protocols:
 
-1. **echo**: Zeilenumbruch-terminierte Nachrichten (`\n`)
-2. **http**: HTTP/1.1 ohne HTTPS oder WebSocket
-3. **iso8583**: ISO-8583-Nachrichten mit 2-Byte-Header für die Längenangabe
-4. **modbus**: Modbus/TCP-Protokoll
-5. **mpu**: MPU Switch Format für ISO-8583
+1. **echo**: Newline-terminated messages (`\n`)
+2. **http**: HTTP/1.1 without HTTPS or WebSocket
+3. **iso8583**: ISO-8583 messages with 2-byte length header
+4. **modbus**: Modbus/TCP protocol
+5. **mpu**: MPU Switch Format for ISO-8583
 
 ```bash
 $ ./tcp-multiplexer list
@@ -75,25 +81,25 @@ usage for example: ./tcp-multiplexer server -p echo
 
 ## Installation
 
-### Option 1: Vorkompilierte Binärdateien
+### Option 1: Pre-compiled Binaries
 
-Lade die neueste Version von der [Releases-Seite](https://github.com/Xerolux/tcp-multiplexer/releases) für dein Betriebssystem und deine Architektur herunter:
+Download the latest version from the [Releases page](https://github.com/Xerolux/tcp-multiplexer/releases) for your operating system and architecture:
 
 ```bash
-# Beispiel für Linux amd64
+# Example for Linux amd64
 wget https://github.com/Xerolux/tcp-multiplexer/releases/latest/download/tcp-multiplexer_linux_amd64.tar.gz
 tar -xzf tcp-multiplexer_linux_amd64.tar.gz
 chmod +x tcp-multiplexer
 sudo mv tcp-multiplexer /usr/local/bin/
 ```
 
-### Option 2: Mit Go installieren
+### Option 2: Install with Go
 
 ```bash
 go install github.com/Xerolux/tcp-multiplexer@latest
 ```
 
-Oder aus dem Quellcode kompilieren:
+Or compile from source:
 
 ```bash
 git clone https://github.com/Xerolux/tcp-multiplexer.git
@@ -101,58 +107,58 @@ cd tcp-multiplexer
 make build
 ```
 
-### Option 3: Docker-Container
+### Option 3: Docker Container
 
 ```bash
-# Mit Docker Hub
+# With Docker Hub
 docker pull xerolux/tcp-multiplexer:latest
 
-# Mit GitHub Container Registry
+# With GitHub Container Registry
 docker pull ghcr.io/xerolux/tcp-multiplexer:latest
 ```
 
-## Konfiguration
+## Configuration
 
-### Grundlegende Konfiguration
+### Basic Configuration
 
 ```bash
-tcp-multiplexer server -p <protokoll> -t <ziel-server> -l <port>
+tcp-multiplexer server -p <protocol> -t <target-server> -l <port>
 ```
 
-| Parameter | Beschreibung | Standardwert |
-|-----------|--------------|--------------|
-| `-p, --applicationProtocol` | Zu verwendendes Protokoll (echo/http/iso8583/modbus/mpu) | echo |
-| `-t, --targetServer` | Adresse des Zielservers im Format host:port | 127.0.0.1:1234 |
-| `-l, --listen` | Lokaler Port, auf dem der Multiplexer lauscht | 8000 |
-| `--timeout` | Timeout für Verbindungen in Sekunden | 60 |
-| `--delay` | Verzögerung nach dem Verbindungsaufbau | 0 |
-| `-v, --verbose` | Ausführliche Protokollierung aktivieren | false |
-| `-d, --debug` | Debug-Protokollierung aktivieren | false |
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| `-p, --applicationProtocol` | Protocol to use (echo/http/iso8583/modbus/mpu) | echo |
+| `-t, --targetServer` | Address of the target server in host:port format | 127.0.0.1:1234 |
+| `-l, --listen` | Local port for the multiplexer to listen on | 8000 |
+| `--timeout` | Connection timeout in seconds | 60 |
+| `--delay` | Delay after establishing connection | 0 |
+| `-v, --verbose` | Enable verbose logging | false |
+| `-d, --debug` | Enable debug logging | false |
 
-### Erweiterte Konfiguration
+### Advanced Configuration
 
-Die verbesserte Version unterstützt zusätzliche Parameter:
+The enhanced version supports additional parameters:
 
-| Parameter | Beschreibung | Standardwert |
-|-----------|--------------|--------------|
-| `--max-connections` | Maximale Anzahl gleichzeitiger Verbindungen zum Zielserver | 1 |
-| `--reconnect-backoff` | Anfängliche Wartezeit zwischen Verbindungsversuchen | 1s |
-| `--health-check-interval` | Intervall für Verbindungs-Gesundheitsüberprüfungen | 30s |
-| `--queue-size` | Größe der Anfrage-Warteschlange | 32 |
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| `--max-connections` | Maximum number of simultaneous connections to the target server | 1 |
+| `--reconnect-backoff` | Initial wait time between connection attempts | 1s |
+| `--health-check-interval` | Interval for connection health checks | 30s |
+| `--queue-size` | Size of the request queue | 32 |
 
-## Systemd-Service
+## Systemd Service
 
-Für einen automatischen Start des TCP-Multiplexers beim Systemstart auf Linux-Systemen mit systemd kannst du einen systemd-Service einrichten.
+For automatic startup of TCP-Multiplexer on Linux systems with systemd, you can set up a systemd service.
 
-### Service-Datei erstellen
+### Create Service File
 
-Erstelle die Datei `/etc/systemd/system/tcp-multiplexer.service`:
+Create the file `/etc/systemd/system/tcp-multiplexer.service`:
 
 ```bash
 sudo nano /etc/systemd/system/tcp-multiplexer.service
 ```
 
-Füge den folgenden Inhalt ein (passe die Parameter an deine Umgebung an):
+Add the following content (adjust parameters for your environment):
 
 ```ini
 [Unit]
@@ -180,47 +186,47 @@ NoNewPrivileges=true
 WantedBy=multi-user.target
 ```
 
-### Benutzer für den Service erstellen
+### Create User for the Service
 
 ```bash
 sudo useradd -r -s /bin/false tcp-multiplexer
 ```
 
-### Service aktivieren und starten
+### Enable and Start Service
 
 ```bash
-# Lade die systemd-Konfiguration neu
+# Reload systemd configuration
 sudo systemctl daemon-reload
 
-# Aktiviere den Service für automatischen Start beim Booten
+# Enable service to start on boot
 sudo systemctl enable tcp-multiplexer.service
 
-# Starte den Service
+# Start the service
 sudo systemctl start tcp-multiplexer.service
 
-# Überprüfe den Status
+# Check status
 sudo systemctl status tcp-multiplexer.service
 ```
 
-### Service verwalten
+### Manage Service
 
 ```bash
-# Service stoppen
+# Stop service
 sudo systemctl stop tcp-multiplexer.service
 
-# Service neustarten
+# Restart service
 sudo systemctl restart tcp-multiplexer.service
 
-# Logs anzeigen
+# View logs
 sudo journalctl -u tcp-multiplexer.service
 
-# Logs fortlaufend anzeigen
+# Follow logs in real-time
 sudo journalctl -u tcp-multiplexer.service -f
 ```
 
-### Konfiguration anpassen
+### Adjust Configuration
 
-Wenn du die Konfiguration des Services ändern möchtest, bearbeite die Service-Datei und starte den Service neu:
+To change the service configuration, edit the service file and restart:
 
 ```bash
 sudo nano /etc/systemd/system/tcp-multiplexer.service
@@ -228,19 +234,19 @@ sudo systemctl daemon-reload
 sudo systemctl restart tcp-multiplexer.service
 ```
 
-## Verwendungsbeispiele
+## Usage Examples
 
-### Beispiel: Modbus-Proxy für Solarwechselrichter
+### Example: Modbus Proxy for Solar Inverters
 
 ```bash
-# Über Kommandozeile
+# Via command line
 tcp-multiplexer server -p modbus -t 192.168.1.22:1502 -l 5020 -v --max-connections 2
 
-# Mit Docker
+# With Docker
 docker run -p 5020:5020 ghcr.io/xerolux/tcp-multiplexer server -t 192.168.1.22:1502 -l 5020 -p modbus -v
 ```
 
-### Beispiel: HTTP-Proxy mit Connection-Pool
+### Example: HTTP Proxy with Connection Pool
 
 ```bash
 tcp-multiplexer server -p http -t backend.example.com:80 -l 8080 --max-connections 5 --health-check-interval 60s
@@ -248,7 +254,7 @@ tcp-multiplexer server -p http -t backend.example.com:80 -l 8080 --max-connectio
 
 ### Docker Compose
 
-Verwende die enthaltene `compose.yml`-Datei als Vorlage:
+Use the included `compose.yml` file as a template:
 
 ```yaml
 services:
@@ -261,18 +267,18 @@ services:
     restart: unless-stopped
 ```
 
-## Tests durchführen
+## Testing
 
-### Echo-Server-Test
+### Echo Server Test
 
-1. Start eines Echo-Servers (lauscht auf Port 1234)
+1. Start an echo server (listening on port 1234)
 
 ```bash
 $ go run example/echo-server/main.go
 1: 127.0.0.1:1234 <-> 127.0.0.1:58088
 ```
 
-2. Start des TCP-Multiplexers (lauscht auf Port 8000)
+2. Start the TCP-Multiplexer (listening on port 8000)
 
 ```bash
 $ ./tcp-multiplexer server -p echo -t 127.0.0.1:1234 -l 8000
@@ -281,65 +287,74 @@ INFO[2021-05-09T02:06:40+08:00] new target connection: 127.0.0.1:58088 <-> 127.0
 INFO[2021-05-09T02:07:57+08:00] #1: 127.0.0.1:58342 <-> 127.0.0.1:8000
 ```
 
-3. Client-Test
+3. Test with a client
 
 ```bash
 $ nc 127.0.0.1 8000
-kkk
-kkk
+hello
+hello
 ^C
 $ nc 127.0.0.1 8000
-mmm
-mmm
+world
+world
 ```
 
-## Performance-Optimierung
+## Performance Optimization
 
-Um die bestmögliche Leistung zu erzielen:
+To achieve the best performance:
 
-1. **Connection-Pool anpassen**: Erhöhe `--max-connections` für höheren Durchsatz, insbesondere bei vielen gleichzeitigen Clients.
+1. **Adjust Connection Pool**: Increase `--max-connections` for higher throughput, especially with many concurrent clients.
 
-2. **Gesundheitsüberwachung konfigurieren**: Passe `--health-check-interval` an die Stabilität deines Netzwerks an.
+2. **Configure Health Monitoring**: Adjust `--health-check-interval` based on your network stability.
 
-3. **Warteschlangengrößen optimieren**: Erhöhe bei Bedarf `--queue-size` für Anwendungen mit Burst-Traffic.
+3. **Optimize Queue Sizes**: Increase `--queue-size` for applications with bursty traffic.
 
-4. **Verbindungs-Timeouts**: Stelle sicher, dass `--timeout` ausreichend lang ist, um legitime Operationen abzuschließen, aber kurz genug, um hängende Verbindungen zu erkennen.
+4. **Connection Timeouts**: Ensure `--timeout` is long enough to complete legitimate operations but short enough to detect hanging connections.
 
-5. **Container-Limits**: Bei Verwendung mit Docker solltest du angemessene CPU- und Speicherbeschränkungen setzen.
+5. **Container Limits**: When using with Docker, set appropriate CPU and memory constraints.
 
-## Fehlerbehebung
+## Troubleshooting
 
-### Häufige Probleme
+### Common Issues
 
-1. **Verbindungsfehler zum Zielserver**:
-   - Überprüfe die Netzwerkverbindung zum Zielserver
-   - Vergewissere dich, dass der Zielserver auf dem angegebenen Port lauscht
-   - Erhöhe `--verbose` für detailliertere Logs
+1. **Connection Failures to Target Server**:
+   - Check network connectivity to the target server
+   - Verify the target server is listening on the specified port
+   - Increase `--verbose` for more detailed logs
 
-2. **Timeouts während der Kommunikation**:
-   - Erhöhe den Timeout-Wert mit `--timeout`
-   - Überprüfe die Netzwerklatenz zum Zielserver
+2. **Timeouts During Communication**:
+   - Increase timeout value with `--timeout`
+   - Check network latency to the target server
 
-3. **Hohe CPU- oder Speicherauslastung**:
-   - Reduziere `--max-connections` oder `--queue-size`
-   - Überprüfe, ob der Zielserver mit dem Verkehrsvolumen umgehen kann
+3. **High CPU or Memory Usage**:
+   - Reduce `--max-connections` or `--queue-size`
+   - Verify the target server can handle the traffic volume
 
-4. **Inkonsistente Antworten**:
-   - Stelle sicher, dass das richtige Protokoll mit `-p` ausgewählt wurde
-   - Überprüfe, ob der Zielserver das erwartete Protokoll unterstützt
+4. **Inconsistent Responses**:
+   - Ensure the correct protocol is selected with `-p`
+   - Verify the target server supports the expected protocol
 
-### Logging und Debugging
+### Logging and Debugging
 
-Aktiviere ausführliche Protokollierung für eine bessere Fehlerbehebung:
+Enable verbose logging for better troubleshooting:
 
 ```bash
 tcp-multiplexer server -p modbus -t 192.168.1.22:1502 -l 5020 -v -d
 ```
 
-## Mitwirken
+## Contributing
 
-Beiträge sind willkommen! Bitte öffne Issues oder Pull Requests für Verbesserungen oder Fehlerbehebungen.
+Contributions are welcome! Please open issues or pull requests for improvements or bug fixes.
 
-## Lizenz
+## License
 
-Dieses Projekt steht unter der MIT-Lizenz - siehe die [LICENSE](LICENSE) Datei für Details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Sponsorship
+
+If you find this project useful, please consider supporting its development:
+
+[![GitHub Sponsor](https://img.shields.io/github/sponsors/xerolux?logo=github&style=flat-square&color=blue)](https://github.com/sponsors/xerolux)
+[![Ko-Fi](https://img.shields.io/badge/Ko--fi-xerolux-blue?logo=ko-fi&style=flat-square)](https://ko-fi.com/xerolux)
+[![Patreon](https://img.shields.io/badge/Patreon-Xerolux-red?logo=patreon&style=flat-square)](https://patreon.com/Xerolux)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-xerolux-yellow?logo=buy-me-a-coffee&style=flat-square)](https://www.buymeacoffee.com/xerolux)
