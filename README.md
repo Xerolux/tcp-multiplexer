@@ -358,3 +358,4 @@ If you find this project useful, please consider supporting its development:
 [![Ko-Fi](https://img.shields.io/badge/Ko--fi-xerolux-blue?logo=ko-fi&style=flat-square)](https://ko-fi.com/xerolux)
 [![Patreon](https://img.shields.io/badge/Patreon-Xerolux-red?logo=patreon&style=flat-square)](https://patreon.com/Xerolux)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-xerolux-yellow?logo=buy-me-a-coffee&style=flat-square)](https://www.buymeacoffee.com/xerolux)
+[![Tesla Referral](https://img.shields.io/badge/Tesla%20Referral-Sebastian-FF0000?logo=tesla&style=flat-square)](https://ts.la/sebastian564489)
