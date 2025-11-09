@@ -58,7 +58,7 @@ jobs:
         run: |
           GOOS=${{ matrix.go-os }} GOARCH=${{ matrix.go-arch }} go build -o tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}${{ matrix.go-os == 'windows' && '.exe' || '' }} -v .
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}
           path: tcp-multiplexer-${{ matrix.go-os }}-${{ matrix.go-arch }}${{ matrix.go-os == 'windows' && '.exe' || '' }}
